@@ -1,3 +1,5 @@
-"""Generation layer (next step): LLM provider interface (Anthropic, OpenAI, local
-Ollama), versioned prompt templates, and the detect -> retrieve -> generate
-orchestrator."""
+"""Generation layer: LLM providers, versioned prompts and the orchestrator."""
+
+from .orchestrator import Orchestrator, ReviewItem, extract_snippet
+
+__all__ = ["Orchestrator", "ReviewItem", "extract_snippet"]
