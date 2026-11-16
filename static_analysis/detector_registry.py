@@ -26,9 +26,10 @@ class PatternDetector(ABC):
 
 def _all_detectors() -> list[PatternDetector]:
     # Imported here to keep the registry free of import cycles.
+    from .pattern_detectors.raw_new_delete import RawNewDeleteDetector
     from .pattern_detectors.virtual_destructor import VirtualDestructorDetector
 
-    return [VirtualDestructorDetector()]
+    return [VirtualDestructorDetector(), RawNewDeleteDetector()]
 
 
 DETECTORS: dict[str, PatternDetector] = {d.skill_id: d for d in _all_detectors()}

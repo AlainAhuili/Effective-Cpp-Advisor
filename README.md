@@ -14,7 +14,7 @@ model's unverified recollection.
 ```
 $ python -m cli.main detect examples/sample_violations.cpp
 
-examples/sample_violations.cpp: 1 finding(s)
+examples/sample_violations.cpp: 4 finding(s)
 ------------------------------------------------------------
 [item_07_virtual_destructors] examples/sample_violations.cpp:5:7
   -> Shape declares virtual area(), so it is a polymorphic base class, but it
@@ -23,15 +23,21 @@ examples/sample_violations.cpp: 1 finding(s)
      skips the derived destructor. Fix: declare `virtual ~Shape() = default;`,
      or make the destructor protected if objects must never be deleted
      through Shape*.
+[item_13_use_objects_to_manage_resources] examples/sample_violations.cpp:41:19
+  -> `new int[samples]` in process() allocates memory that no object owns.
+     If an exception or an early return skips the matching delete, it leaks.
+     Fix: use std::vector<int> (or std::make_unique<int[]>(n)) so the array
+     is released automatically.
+...
 ```
 
 Implementation status
 
 | Layer | Status |
 | --- | --- |
-| Detection: Clang AST via `libclang` (`static_analysis/`) | Working: Item 7 (virtual destructors), 15 tests |
+| Detection: Clang AST via `libclang` (`static_analysis/`) | Working: Item 7 (virtual destructors), Item 13 (raw `new`/`delete`, RAII); 36 tests |
 | `detect` CLI command (no LLM) | Working |
-| Knowledge base (`skills/effective_cpp/`) | Item 7 written, template in place |
+| Knowledge base (`skills/effective_cpp/`) | Items 7 and 13 written, template in place |
 | RAG retrieval (`rag/`) | Planned |
 | LLM providers and prompts (`agent/`) | Planned |
 | `review` and `ingest` CLI commands | Planned |

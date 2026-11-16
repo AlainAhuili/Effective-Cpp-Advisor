@@ -33,5 +33,16 @@ protected:
 };
 
 void destroy(Shape* s) {
-    delete s;  // undefined behavior if s points to a Circle
+    delete s;  // undefined behavior if s points to a Circle (Item 7), manual delete (Item 13)
+}
+
+// Item 13: raw new with manual delete; the early return leaks.
+bool process(int samples) {
+    int* buffer = new int[samples];
+    if (samples > 1024) {
+        return false;  // buffer is never freed
+    }
+    buffer[0] = 0;
+    delete[] buffer;
+    return true;
 }
