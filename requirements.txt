@@ -1,0 +1,6 @@
+# Detection layer: Clang's C API via the official Python bindings.
+# The wheel bundles libclang, so no system LLVM install is needed.
+libclang>=18
+
+# Tests
+pytest>=8
