@@ -25,9 +25,15 @@ class Skill:
 
     @property
     def text(self) -> str:
-        """The whole entry as markdown, for prompts."""
+        """The whole entry as markdown."""
+        return self.text_for(tuple(self.sections))
+
+    def text_for(self, section_names: tuple[str, ...]) -> str:
+        """Only the named sections (in file order), e.g. without example code."""
         parts = [f"# {self.title}", f"Source: {self.source}"]
-        parts += [f"## {name}\n{body}" for name, body in self.sections.items()]
+        parts += [
+            f"## {name}\n{body}" for name, body in self.sections.items() if name in section_names
+        ]
         return "\n\n".join(parts)
 
 

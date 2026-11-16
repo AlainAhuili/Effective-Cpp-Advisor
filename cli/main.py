@@ -68,11 +68,13 @@ def _review(files: list[str], provider_name: str, clang_args: list[str]) -> int:
         except (ParseError, LLMError) as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 2
-        total += len(items)
-        print(f"{path}: {len(items)} finding(s)  [provider: {provider_name}]")
+        count = sum(len(item.findings) for item in items)
+        total += count
+        print(f"{path}: {count} finding(s) in {len(items)} group(s)  [provider: {provider_name}]")
         print(RULE)
         for item in items:
-            print(f"[{item.finding.skill_id}] {item.finding.location()}")
+            for f in item.findings:
+                print(f"[{f.skill_id}] {f.location()}")
             print(item.snippet)
             print()
             for line in item.explanation.splitlines():

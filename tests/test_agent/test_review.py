@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from agent import Orchestrator, extract_snippet
+from agent import Orchestrator, extract_snippet, group_findings
 from agent.llm_provider import (
     AnthropicProvider,
     LLMError,
@@ -25,6 +25,7 @@ from agent.llm_provider import (
 from agent.prompts import load_prompt
 from cli.main import main as cli_main
 from rag import Retriever
+from static_analysis import Finding
 
 EXAMPLE = Path(__file__).resolve().parents[2] / "examples" / "sample_violations.cpp"
 
@@ -54,14 +55,34 @@ def test_snippet_marks_the_finding_line_and_clips_at_file_edges():
     assert snippet.splitlines() == [">> 1 | a", "   2 | b", "   3 | c"]
 
 
+def test_snippet_marks_several_lines_and_spans_between_them():
+    lines = [f"l{n}" for n in range(1, 11)]
+    snippet = extract_snippet(lines, [3, 6], context=1)
+    assert snippet.splitlines() == [
+        "   2 | l2",
+        ">> 3 | l3",
+        "   4 | l4",
+        "   5 | l5",
+        ">> 6 | l6",
+        "   7 | l7",
+    ]
+
+
 def test_prompt_template_loads_and_renders_all_placeholders():
     prompt = load_prompt("review_explainer")
-    assert prompt.id == "review_explainer" and prompt.version == 1
+    assert prompt.id == "review_explainer" and prompt.version == 2
     system, user = prompt.render(
-        skill_id="item_x", location="a.cpp:1:1", message="M", snippet="S", reference="R", related_block=""
+        count="2",
+        scope="process()",
+        location="a.cpp:41-46",
+        findings="- line 41 ...",
+        snippet="S",
+        reference="R",
+        related_block="",
     )
     assert "What is wrong" in system
-    assert "item_x" in user and "a.cpp:1:1" in user and "R" in user
+    assert "ONE fix" in system and "Keep its function" in system
+    assert "2 finding(s) in process() at a.cpp:41-46" in user
 
 
 def test_prompt_render_fails_loudly_on_a_missing_placeholder():
@@ -72,23 +93,65 @@ def test_prompt_render_fails_loudly_on_a_missing_placeholder():
 # --- Orchestrator -----------------------------------------------------------
 
 
-def test_review_sends_grounded_prompt_per_finding(retriever):
+def f(line: int, symbol: str, skill: str = "item_13_use_objects_to_manage_resources") -> Finding:
+    return Finding(skill, "a.cpp", line, 1, symbol, f"msg {line}")
+
+
+def test_findings_in_the_same_function_are_grouped():
+    groups = group_findings([f(46, "process()"), f(36, "destroy()"), f(41, "process()")])
+    assert [[x.line for x in g] for g in groups] == [[36], [41, 46]]
+
+
+def test_findings_far_apart_in_one_function_are_split():
+    groups = group_findings([f(10, "big()"), f(20, "big()"), f(80, "big()")])
+    assert [[x.line for x in g] for g in groups] == [[10, 20], [80]]
+
+
+def test_same_symbol_in_different_files_is_not_grouped():
+    a, b = f(1, "x()"), Finding("item_13_use_objects_to_manage_resources", "b.cpp", 1, 1, "x()", "m")
+    assert len(group_findings([a, b])) == 2
+
+
+def test_review_sends_one_grounded_prompt_per_group(retriever):
     llm = FakeLLM()
     items = Orchestrator(llm, retriever).review_file(EXAMPLE)
 
-    assert [i.finding.skill_id for i in items] == [
-        "item_07_virtual_destructors",
-        "item_13_use_objects_to_manage_resources",
-        "item_13_use_objects_to_manage_resources",
-        "item_13_use_objects_to_manage_resources",
-    ]
-    assert len(llm.calls) == 4
-    assert [i.explanation for i in items] == [f"explanation #{n}" for n in range(1, 5)]
+    assert [[x.line for x in i.findings] for i in items] == [[5], [36], [41, 46]]
+    assert [i.scope for i in items] == ["Shape", "destroy()", "process()"]
+    assert len(llm.calls) == 3
+    assert [i.explanation for i in items] == ["explanation #1", "explanation #2", "explanation #3"]
 
-    _, first_prompt = llm.calls[0]
-    assert ">> 5 | class Shape {" in first_prompt
-    assert "Declare destructors virtual in polymorphic base classes" in first_prompt  # SKILL.md title
+    _, shape_prompt = llm.calls[0]
+    assert ">> 5 | class Shape {" in shape_prompt
+    assert "Declare destructors virtual in polymorphic base classes" in shape_prompt
     assert items[0].sources[0] == "item_07_virtual_destructors"
+
+    _, process_prompt = llm.calls[2]
+    assert "2 finding(s) in process() at" in process_prompt
+    assert ">> 41 |" in process_prompt and ">> 46 |" in process_prompt
+    assert "line 41 (item_13_use_objects_to_manage_resources)" in process_prompt
+
+
+def test_prompt_contains_principles_but_no_example_code(retriever):
+    llm = FakeLLM()
+    Orchestrator(llm, retriever).review_file(EXAMPLE)
+    prompts = "\n".join(user for _, user in llm.calls)
+    assert "## Why it matters" in prompts and "## Rule" in prompts
+    # Generic knowledge-base code that small models copied verbatim:
+    for leaked in ("class Plugin", "Parser", "Config", "## Example", "## Fix"):
+        assert leaked not in prompts, leaked
+
+
+def test_sources_list_only_what_the_explanation_used(retriever):
+    model_items = Orchestrator(FakeLLM(), retriever).review_file(EXAMPLE)
+    for item in model_items:
+        assert not any(s.endswith(("#Example", "#Fix")) for s in item.sources), item.sources
+    offline_items = Orchestrator(OfflineProvider(), retriever).review_file(EXAMPLE)
+    assert [i.sources for i in offline_items] == [
+        ["item_07_virtual_destructors"],
+        ["item_13_use_objects_to_manage_resources"],
+        ["item_13_use_objects_to_manage_resources"],
+    ]
 
 
 def test_offline_provider_explains_from_the_knowledge_base_without_a_model(retriever):
@@ -96,7 +159,10 @@ def test_offline_provider_explains_from_the_knowledge_base_without_a_model(retri
     first = items[0].explanation
     assert first.startswith("Shape declares virtual area()")
     assert "Why it matters:" in first
-    assert "virtual ~Shape() = default;" in first
+    assert "class Plugin" not in first  # generic example code is not shown
+    process = items[2].explanation
+    assert "`new int[samples]` in process()" in process
+    assert "Manual `delete[]` in process()" in process
 
 
 # --- Providers (HTTP mocked) ------------------------------------------------
@@ -168,7 +234,7 @@ def test_cli_review_offline_reports_findings(capsys):
     code = cli_main(["review", str(EXAMPLE), "--provider", "offline"])
     out = capsys.readouterr().out
     assert code == 1
-    assert "4 finding(s)  [provider: offline]" in out
+    assert "4 finding(s) in 3 group(s)  [provider: offline]" in out
     assert "(sources: item_07_virtual_destructors" in out
 
 

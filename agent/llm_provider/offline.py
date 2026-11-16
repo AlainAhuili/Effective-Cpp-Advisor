@@ -1,15 +1,17 @@
-"""No model at all: the explanation is assembled from the retrieved SKILL.md.
+"""No model at all: the explanation is assembled from the detector messages and
+the retrieved SKILL.md.
 
-Used for CI, demos without API keys, and as a baseline. It shows exactly what
-grounding the LLM gets, without the LLM's wording.
+Used for CI, demos without API keys, and as a baseline. The detector message
+already carries a fix tailored to the code, so only the principle's "Why it
+matters" is added; the knowledge base's generic example code is left out
+because it doesn't match the user's code.
 """
 
 from __future__ import annotations
 
 from .base import LLMProvider
 
-# The orchestrator hands this provider the context directly instead of a prompt.
-OFFLINE_SECTIONS = ("Why it matters", "Fix")
+OFFLINE_SECTIONS = ("Why it matters",)
 
 
 class OfflineProvider(LLMProvider):
@@ -19,9 +21,10 @@ class OfflineProvider(LLMProvider):
         raise NotImplementedError("the orchestrator calls explain_offline() for this provider")
 
 
-def explain_offline(finding_message: str, sections: dict[str, str]) -> str:
-    parts = [finding_message]
-    for name in OFFLINE_SECTIONS:
-        if name in sections:
-            parts.append(f"{name}:\n{sections[name]}")
+def explain_offline(messages: list[str], skills_sections: list[dict[str, str]]) -> str:
+    parts = list(messages)
+    for sections in skills_sections:
+        for name in OFFLINE_SECTIONS:
+            if name in sections:
+                parts.append(f"{name}:\n{sections[name]}")
     return "\n\n".join(parts)
