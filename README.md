@@ -35,12 +35,12 @@ Implementation status
 
 | Layer | Status |
 | --- | --- |
-| Detection: Clang AST via `libclang` (`static_analysis/`) | Working: Item 7 (virtual destructors), Item 13 (raw `new`/`delete`, RAII); 36 tests |
+| Detection: Clang AST via `libclang` (`static_analysis/`) | Working: Item 7 (virtual destructors), Item 13 (raw `new`/`delete`, RAII) |
 | `detect` CLI command (no LLM) | Working |
 | Knowledge base (`skills/effective_cpp/`) | Items 7 and 13 written, template in place |
-| RAG retrieval (`rag/`) | Planned |
-| LLM providers and prompts (`agent/`) | Planned |
-| `review` and `ingest` CLI commands | Planned |
+| RAG retrieval (`rag/`) | Working: exact skill lookup + similarity search over a local JSON index; offline hashing embeddings, optional Ollama embeddings |
+| LLM providers and prompts (`agent/`) | Working: `offline` (no model), `local` (Ollama), `anthropic`, `openai`; versioned prompt file |
+| `review` and `ingest` CLI commands | Working; 63 tests in total, no API key needed |
 | MCP tools and closed-loop patch verification | Planned |
 
 The sections below describe the target architecture; parts marked
@@ -77,15 +77,22 @@ effective-cpp-advisor/
 ```
 Setup
 ```bash
-pip install -r requirements.txt      # or a subset — see requirements.txt comments
+pip install -r requirements.txt
 
-# Build the RAG vector store from skills/effective_cpp/*/SKILL.md
+# Detectors only (no LLM)
+python -m cli.main detect examples/sample_violations.cpp
+
+# Build the RAG index from skills/effective_cpp/*/SKILL.md (review also builds it on the fly)
 python -m cli.main ingest
 
-# Review a file — pick any provider
-python -m cli.main review examples/sample_violations.cpp --provider local      # Ollama, fully offline
-python -m cli.main review examples/sample_violations.cpp --provider anthropic  # needs ANTHROPIC_API_KEY
-python -m cli.main review examples/sample_violations.cpp --provider openai     # needs OPENAI_API_KEY
+# Review a file: detect -> retrieve -> explain. Pick a provider:
+python -m cli.main review examples/sample_violations.cpp                        # offline: knowledge base only, no model
+python -m cli.main review examples/sample_violations.cpp --provider local       # Ollama, fully offline
+python -m cli.main review examples/sample_violations.cpp --provider anthropic   # needs ANTHROPIC_API_KEY
+python -m cli.main review examples/sample_violations.cpp --provider openai      # needs OPENAI_API_KEY
+
+# Model names come from the environment, so upgrades need no code change:
+#   ADVISOR_ANTHROPIC_MODEL, ADVISOR_OPENAI_MODEL, ADVISOR_OLLAMA_MODEL, OLLAMA_HOST
 ```
 Design decisions
 Detection is deterministic, not LLM-driven. For a code review tool,
@@ -121,6 +128,7 @@ New LLM backend: implement `LLMProvider`, add a branch in
 New embedding backend: implement `EmbeddingProvider`, swap the
 return of `get_default_provider()`.
 Status
-Portfolio project in active development. The detection layer is real and
-tested; retrieval, generation and the agent tooling are being built next
-(see the implementation status table at the top).
+Portfolio project in active development. Detection, retrieval and
+generation work end to end and are tested without any API key; the MCP
+tool layer and closed-loop patch verification are next (see the
+implementation status table at the top).

@@ -26,3 +26,8 @@ jobs:
           set +e
           python -m cli.main detect examples/sample_violations.cpp
           test $? -eq 1
+      - name: Offline review of the example file (no model, no API key)
+        run: |
+          set +e
+          python -m cli.main review examples/sample_violations.cpp --provider offline
+          test $? -eq 1
