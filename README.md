@@ -12,20 +12,40 @@ and where, with certainty. RAG + the LLM tell you why it matters
 and how to fix it, grounded in reference material instead of the
 model's unverified recollection.
 ```
-$ python -m cli.main review examples/sample_violations.cpp --provider local
+$ python -m cli.main detect examples/sample_violations.cpp
 
-examples/sample_violations.cpp: 5 finding(s)
+examples/sample_violations.cpp: 4 finding(s)
 ------------------------------------------------------------
-[item_07_virtual_destructors] examples/sample_violations.cpp:4
-  class Shape {
-  -> Shape declares a virtual `area()` method, marking it as a
-     polymorphic base class, but its destructor isn't virtual. Deleting
-     a derived object (e.g. a Circle) through a Shape* will only run
-     ~Shape(), silently skipping the derived destructor. Fix: declare
-     `virtual ~Shape() = default;`.
+[item_07_virtual_destructors] examples/sample_violations.cpp:5:7
+  -> Shape declares virtual area(), so it is a polymorphic base class, but it
+     has no user-declared destructor, so the implicit one is not virtual.
+     Deleting a derived object through a Shape* is undefined behavior and
+     skips the derived destructor. Fix: declare `virtual ~Shape() = default;`,
+     or make the destructor protected if objects must never be deleted
+     through Shape*.
+[item_13_use_objects_to_manage_resources] examples/sample_violations.cpp:41:19
+  -> `new int[samples]` in process() allocates memory that no object owns.
+     If an exception or an early return skips the matching delete, it leaks.
+     Fix: use std::vector<int> (or std::make_unique<int[]>(n)) so the array
+     is released automatically.
 ...
-------------------------------------------------------------
 ```
+
+Implementation status
+
+| Layer | Status |
+| --- | --- |
+| Detection: Clang AST via `libclang` (`static_analysis/`) | Working: Item 7 (virtual destructors), Item 13 (raw `new`/`delete`, RAII); 36 tests |
+| `detect` CLI command (no LLM) | Working |
+| Knowledge base (`skills/effective_cpp/`) | Items 7 and 13 written, template in place |
+| RAG retrieval (`rag/`) | Planned |
+| LLM providers and prompts (`agent/`) | Planned |
+| `review` and `ingest` CLI commands | Planned |
+| MCP tools and closed-loop patch verification | Planned |
+
+The sections below describe the target architecture; parts marked
+"Planned" above are not implemented yet.
+
 Architecture
 ```
 parse (static_analysis/) -> detect -> retrieve (rag/) -> generate (agent/)
@@ -82,13 +102,13 @@ Provider abstraction is real, not cosmetic. `LLMProvider` and
 `EmbeddingProvider` are the only interfaces the rest of the codebase
 depends on. The `local` provider (Ollama) proves this: the full
 pipeline runs with zero API keys and zero network calls.
-Regex-based detectors, not a full AST parser, for this scaffold.
-Each detector implements `PatternDetector.detect()` in
-`static_analysis/detector_registry.py`. The natural production upgrade
-is swapping the regex implementations for a `libclang`/`clang-tidy`
-AST visitor — the interface doesn't change, only what's inside each
-`detect()` method, which is the point of keeping detection behind an
-interface in the first place.
+Clang AST detectors, not regular expressions. Each detector implements
+`PatternDetector.detect()` (see `static_analysis/detector_registry.py`)
+and walks the Clang translation unit via the official `libclang` Python
+bindings. That means comments, formatting and macros can't fool it, and
+semantic facts are available directly: whether a method is virtual,
+which access specifier a destructor has, what a class inherits. Only
+declarations in the analyzed file are reported, not those from headers.
 Prompts are versioned markdown files, not inline strings. See
 `agent/prompts/review_explainer.prompt.md` — this makes prompt changes
 reviewable in diffs and separable from orchestration code.
@@ -101,8 +121,6 @@ New LLM backend: implement `LLMProvider`, add a branch in
 New embedding backend: implement `EmbeddingProvider`, swap the
 return of `get_default_provider()`.
 Status
-Scaffold / portfolio project. Detectors are intentionally simple
-(regex-based) to keep the project buildable in days rather than weeks;
-the architecture is designed so the detection layer can be swapped for
-a real AST-based implementation without touching retrieval, generation,
-or the CLI.
+Portfolio project in active development. The detection layer is real and
+tested; retrieval, generation and the agent tooling are being built next
+(see the implementation status table at the top).
