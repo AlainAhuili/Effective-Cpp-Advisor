@@ -13,11 +13,13 @@ from __future__ import annotations
 
 import argparse
 import sys
+import textwrap
 
 from static_analysis import ParseError, parse_file, run_all
 from static_analysis.parser import DEFAULT_ARGS
 
 RULE = "-" * 60
+WRAP = 78  # width of explanation text, so the output reads well in a normal terminal
 
 
 def _detect(files: list[str], clang_args: list[str]) -> int:
@@ -77,12 +79,33 @@ def _review(files: list[str], provider_name: str, clang_args: list[str]) -> int:
                 print(f"[{f.skill_id}] {f.location()}")
             print(item.snippet)
             print()
-            for line in item.explanation.splitlines():
-                print(f"  {line}" if line else "")
+            for line in _wrap_explanation(item.explanation):
+                print(line)
             print(f"  (sources: {', '.join(item.sources)})")
             print(RULE)
         print()
     return 1 if total else 0
+
+
+def _wrap_explanation(text: str) -> list[str]:
+    """Indents the explanation by two spaces and wraps long prose lines.
+
+    Code stays as it is: lines inside ``` fences and lines that already start
+    with whitespace are never re-wrapped.
+    """
+    out: list[str] = []
+    in_code = False
+    for line in text.splitlines():
+        if line.strip().startswith("```"):
+            in_code = not in_code
+        if not line:
+            out.append("")
+        elif in_code or line[0].isspace() or line.strip().startswith("```"):
+            out.append(f"  {line}")
+        else:
+            out.extend(textwrap.wrap(line, WRAP, initial_indent="  ", subsequent_indent="  ",
+                                     break_long_words=False, break_on_hyphens=False))
+    return out
 
 
 def main(argv: list[str] | None = None) -> int:
