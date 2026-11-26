@@ -5,6 +5,8 @@
 # Run everything on demand:
 #   pre-commit run --all-files
 default_install_hook_types: [pre-commit, commit-msg]
+# Hooks run on staged files only; the message check sets its own stage.
+default_stages: [pre-commit]
 
 repos:
   # Basic hygiene
