@@ -1,9 +1,57 @@
-# Install both hook types once per clone:
+# Quality gates that run before code leaves your machine.
+# Set up once per clone:
 #   pip install pre-commit
-#   pre-commit install --hook-type pre-commit --hook-type commit-msg
+#   pre-commit install
+# Run everything on demand:
+#   pre-commit run --all-files
 default_install_hook_types: [pre-commit, commit-msg]
 
 repos:
+  # Basic hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=500]
+
+  # Python: lint (with autofix) and format
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.6
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  # Python: static types. Checks the packages listed under [tool.mypy] in
+  # pyproject.toml as a whole, not only the staged files.
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.4.1
+    hooks:
+      - id: mypy
+        pass_filenames: false
+        args: []
+
+  # C++: format with .clang-format. examples/ holds test fixtures whose
+  # line numbers the tests rely on, so they are left exactly as written.
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v23.1.5
+    hooks:
+      - id: clang-format
+        types_or: [c++, c]
+        exclude: ^examples/
+
+  # Secrets: block API keys, tokens and private keys before they are committed
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  # Commit messages: Conventional Commits (feeds release-please)
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v4.5.0
     hooks:

@@ -103,8 +103,16 @@ def _wrap_explanation(text: str) -> list[str]:
         elif in_code or line[0].isspace() or line.strip().startswith("```"):
             out.append(f"  {line}")
         else:
-            out.extend(textwrap.wrap(line, WRAP, initial_indent="  ", subsequent_indent="  ",
-                                     break_long_words=False, break_on_hyphens=False))
+            out.extend(
+                textwrap.wrap(
+                    line,
+                    WRAP,
+                    initial_indent="  ",
+                    subsequent_indent="  ",
+                    break_long_words=False,
+                    break_on_hyphens=False,
+                )
+            )
     return out
 
 

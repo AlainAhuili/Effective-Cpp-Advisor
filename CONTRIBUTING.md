@@ -38,9 +38,27 @@ Useful scopes: `detectors`, `rag`, `agent`, `fix`, `cli`, `mcp`, `docker`.
 ## Local hooks
 
 ```bash
-pip install pre-commit
+pip install -e ".[dev]"
 pre-commit install
+pre-commit run --all-files   # optional: check the whole repo once
 ```
 
-This installs the commit-message check (see `.pre-commit-config.yaml`), so a
-non-conventional message is rejected before it is committed.
+Every `git commit` then runs these checks on the staged files:
+
+| Hook | What it checks |
+|------|----------------|
+| pre-commit-hooks | Trailing whitespace, final newline, valid YAML/TOML, merge markers, files over 500 KB |
+| ruff | Python lint (autofixes what it can) and formatting |
+| mypy | Python types in `agent`, `cli`, `rag`, `static_analysis` |
+| clang-format | C++ formatting per `.clang-format` (`examples/` is excluded: test fixtures) |
+| gitleaks | API keys, tokens and private keys |
+| conventional-pre-commit | The commit message follows Conventional Commits |
+
+If a hook changes files (ruff, clang-format, whitespace), the commit stops:
+review the changes, `git add` them and commit again.
+
+The gitleaks hook builds with Go; pre-commit downloads Go itself the first
+time if it is not installed.
+
+Configuration lives in `pyproject.toml` (`[tool.ruff]`, `[tool.mypy]`),
+`.clang-format` and `.pre-commit-config.yaml`.

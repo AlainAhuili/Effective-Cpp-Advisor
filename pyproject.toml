@@ -6,7 +6,28 @@ requires-python = ">=3.11"
 dependencies = ["libclang>=18"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "pre-commit>=4", "ruff>=0.17", "mypy>=2"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+# E/W pycodestyle, F pyflakes, I isort, B bugbear, UP pyupgrade, SIM simplify
+select = ["E", "W", "F", "I", "B", "UP", "SIM"]
+# "a b c".split() is the clearer way to write a stop-word list.
+ignore = ["SIM905"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["agent", "cli", "rag", "static_analysis"]
+warn_unused_ignores = true
+warn_redundant_casts = true
+check_untyped_defs = true
+# The libclang wheel ships no type hints.
+[[tool.mypy.overrides]]
+module = ["clang", "clang.*"]
+ignore_missing_imports = true

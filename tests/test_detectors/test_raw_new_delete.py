@@ -115,7 +115,9 @@ def test_outer_smart_pointer_does_not_excuse_new_in_a_nested_statement():
     # The unique_ptr only takes ownership after the lambda has run; inside the
     # lambda the memory sits in a raw pointer, so the search must stop at the
     # statement boundary instead of climbing up to the unique_ptr.
-    body = "void f() { std::unique_ptr<Widget> p(([] { Widget* raw = new Widget; return raw; })()); }"
+    body = (
+        "void f() { std::unique_ptr<Widget> p(([] { Widget* raw = new Widget; return raw; })()); }"
+    )
     (finding,) = findings_for(body)
     assert finding.symbol == "a lambda"
 
@@ -168,6 +170,4 @@ def test_new_in_included_header_is_not_reported():
 
 
 def test_detector_is_registered_under_its_skill_id():
-    assert isinstance(
-        DETECTORS["item_13_use_objects_to_manage_resources"], RawNewDeleteDetector
-    )
+    assert isinstance(DETECTORS["item_13_use_objects_to_manage_resources"], RawNewDeleteDetector)

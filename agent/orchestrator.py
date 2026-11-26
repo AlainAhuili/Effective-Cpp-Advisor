@@ -57,7 +57,9 @@ class Orchestrator:
         self.retriever = retriever
         self.prompt = prompt or load_prompt("review_explainer")
 
-    def review_file(self, path: str | Path, clang_args: list[str] | None = None) -> list[ReviewItem]:
+    def review_file(
+        self, path: str | Path, clang_args: list[str] | None = None
+    ) -> list[ReviewItem]:
         tu = parse_file(path, clang_args) if clang_args else parse_file(path)
         source_lines = Path(path).read_text(encoding="utf-8").splitlines()
         return [self.review_group(g, source_lines) for g in group_findings(run_all(tu))]
@@ -85,7 +87,9 @@ class Orchestrator:
             if isinstance(self.llm, OfflineProvider):
                 c.related = []
             else:
-                c.related = [(chunk, s) for chunk, s in c.related if chunk.section in PROMPT_SECTIONS]
+                c.related = [
+                    (chunk, s) for chunk, s in c.related if chunk.section in PROMPT_SECTIONS
+                ]
         return contexts
 
     def _explain(

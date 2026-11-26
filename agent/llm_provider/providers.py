@@ -13,9 +13,10 @@ class AnthropicProvider(LLMProvider):
 
     def __init__(self, model: str | None = None, api_key: str | None = None) -> None:
         self.model = model or os.environ.get("ADVISOR_ANTHROPIC_MODEL", "claude-sonnet-5-5")
-        self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
-        if not self.api_key:
+        key = api_key or os.environ.get("ANTHROPIC_API_KEY")
+        if not key:
             raise LLMError("ANTHROPIC_API_KEY is not set")
+        self.api_key: str = key
 
     def complete(self, system: str, prompt: str) -> str:
         data = post_json(
@@ -28,7 +29,9 @@ class AnthropicProvider(LLMProvider):
             },
             {"x-api-key": self.api_key, "anthropic-version": "2023-06-01"},
         )
-        return "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
+        return "".join(
+            b.get("text", "") for b in data.get("content", []) if b.get("type") == "text"
+        )
 
 
 class OpenAIProvider(LLMProvider):
@@ -36,9 +39,10 @@ class OpenAIProvider(LLMProvider):
 
     def __init__(self, model: str | None = None, api_key: str | None = None) -> None:
         self.model = model or os.environ.get("ADVISOR_OPENAI_MODEL", "gpt-4o-mini")
-        self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
-        if not self.api_key:
+        key = api_key or os.environ.get("OPENAI_API_KEY")
+        if not key:
             raise LLMError("OPENAI_API_KEY is not set")
+        self.api_key: str = key
 
     def complete(self, system: str, prompt: str) -> str:
         data = post_json(

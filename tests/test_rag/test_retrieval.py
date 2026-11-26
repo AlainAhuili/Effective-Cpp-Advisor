@@ -46,7 +46,10 @@ def finding(skill_id: str, message: str = "msg") -> Finding:
 def test_parse_skill_reads_front_matter_and_sections():
     skill = parse_skill(SKILL_MD)
     assert skill.skill_id == "item_99_demo"
-    assert skill.related == ("item_07_virtual_destructors", "item_13_use_objects_to_manage_resources")
+    assert skill.related == (
+        "item_07_virtual_destructors",
+        "item_13_use_objects_to_manage_resources",
+    )
     assert list(skill.sections) == ["Rule", "Example", "Fix"]
     assert "## not a heading inside code" in skill.sections["Example"]
     assert skill.text.startswith("# Demo principle")
