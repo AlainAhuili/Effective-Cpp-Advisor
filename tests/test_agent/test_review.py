@@ -108,7 +108,10 @@ def test_findings_far_apart_in_one_function_are_split():
 
 
 def test_same_symbol_in_different_files_is_not_grouped():
-    a, b = f(1, "x()"), Finding("item_13_use_objects_to_manage_resources", "b.cpp", 1, 1, "x()", "m")
+    a, b = (
+        f(1, "x()"),
+        Finding("item_13_use_objects_to_manage_resources", "b.cpp", 1, 1, "x()", "m"),
+    )
     assert len(group_findings([a, b])) == 2
 
 
